@@ -175,12 +175,13 @@ class MqttInterface:
             bool: True if registered successfully, False otherwise
         """
         if not self.connected:
-            logger.error("Cannot register sensor: not connected to MQTT broker")
+            logger.error(f"Cannot register sensor {entity_id}: not connected to MQTT broker")
             return False
             
         try:
             # Create the state topic where sensor values will be published
             state_topic = f"{self.base_topic}/{entity_id}/state"
+            logger.debug(f"State topic for {entity_id}: {state_topic}")
             
             # Create the discovery payload
             config = {
@@ -207,10 +208,16 @@ class MqttInterface:
                 
             # Create the discovery topic
             discovery_topic = f"{self.discovery_prefix}/sensor/{self.client_id}/{entity_id}/config"
+            logger.debug(f"Discovery topic for {entity_id}: {discovery_topic}")
             
             # Publish the discovery message
-            self.client.publish(discovery_topic, json.dumps(config), qos=1, retain=True)
-            logger.debug(f"Registered sensor {entity_id} with Home Assistant")
+            logger.info(f"Publishing discovery config for sensor {entity_id} to {discovery_topic}")
+            result = self.client.publish(discovery_topic, json.dumps(config), qos=1, retain=True)
+            if result.rc == 0:
+                logger.info(f"Successfully published discovery config for {entity_id}")
+            else:
+                logger.error(f"Failed to publish discovery config for {entity_id}, return code: {result.rc}")
+                return False
             
             # Store the entity info for later use
             self.entities[entity_id] = {
@@ -219,10 +226,11 @@ class MqttInterface:
                 "config": config
             }
             
+            logger.info(f"Sensor {entity_id} successfully registered with Home Assistant")
             return True
             
         except Exception as e:
-            logger.error(f"Error registering sensor: {e}")
+            logger.error(f"Error registering sensor {entity_id}: {e}", exc_info=True)
             return False
             
     def register_select(self, entity_id: str, name: str, options: list,
@@ -240,13 +248,15 @@ class MqttInterface:
             bool: True if registered successfully, False otherwise
         """
         if not self.connected:
-            logger.error("Cannot register select: not connected to MQTT broker")
+            logger.error(f"Cannot register select {entity_id}: not connected to MQTT broker")
             return False
             
         try:
             # Create the topics
             state_topic = f"{self.base_topic}/{entity_id}/state"
             command_topic = f"{self.base_topic}/{entity_id}/command"
+            logger.debug(f"State topic for {entity_id}: {state_topic}")
+            logger.debug(f"Command topic for {entity_id}: {command_topic}")
             
             # Create the discovery payload
             config = {
@@ -269,10 +279,16 @@ class MqttInterface:
                 
             # Create the discovery topic
             discovery_topic = f"{self.discovery_prefix}/select/{self.client_id}/{entity_id}/config"
+            logger.debug(f"Discovery topic for {entity_id}: {discovery_topic}")
             
             # Publish the discovery message
-            self.client.publish(discovery_topic, json.dumps(config), qos=1, retain=True)
-            logger.debug(f"Registered select {entity_id} with Home Assistant")
+            logger.info(f"Publishing discovery config for select {entity_id} to {discovery_topic}")
+            result = self.client.publish(discovery_topic, json.dumps(config), qos=1, retain=True)
+            if result.rc == 0:
+                logger.info(f"Successfully published discovery config for {entity_id}")
+            else:
+                logger.error(f"Failed to publish discovery config for {entity_id}, return code: {result.rc}")
+                return False
             
             # Store the entity info for later use
             self.entities[entity_id] = {
@@ -282,10 +298,11 @@ class MqttInterface:
                 "config": config
             }
             
+            logger.info(f"Select {entity_id} successfully registered with Home Assistant")
             return True
             
         except Exception as e:
-            logger.error(f"Error registering select: {e}")
+            logger.error(f"Error registering select {entity_id}: {e}", exc_info=True)
             return False
             
     def register_button(self, entity_id: str, name: str, icon: str = None) -> bool:

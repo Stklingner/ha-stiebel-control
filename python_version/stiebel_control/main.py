@@ -90,15 +90,17 @@ class StiebelControl:
         else:
             logger.error("Failed to connect to MQTT broker, continuing without MQTT functionality")
             
-        # Register known signals
+        # Value cache
+        self.value_cache = {}
+        
+        # Register known signals - do this at initialization to ensure entities are registered
+        logger.info("Registering entities with Home Assistant during initialization")
         self.registered_entities = set()
+        self._register_entities()
         
         # Thread for updating values
         self.update_thread = None
         self.running = False
-        
-        # Value cache
-        self.value_cache = {}
         
     def _load_config(self) -> Dict:
         """
@@ -151,11 +153,6 @@ class StiebelControl:
             return False
         logger.info("MQTT broker connected successfully")
             
-        # Register entities with Home Assistant
-        logger.info("Registering entities with Home Assistant")
-        self._register_entities()
-        logger.info(f"Entity registration complete, registered {len(self.registered_entities)} entities")
-        
         # Start update thread
         logger.info("Starting update thread")
         self.running = True
