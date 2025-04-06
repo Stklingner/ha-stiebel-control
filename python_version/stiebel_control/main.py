@@ -56,6 +56,9 @@ class StiebelControl:
         can_config = self.config.get('can', {})
         mqtt_config = self.config.get('mqtt', {})
         
+        logger.info(f"Loading CAN configuration from {self.config_file}")
+        logger.debug(f"CAN configuration: {can_config}")
+        
         # Initialize CAN interface
         self.can_interface = CanInterface(
             can_interface=can_config.get('interface', 'can0'),
@@ -63,7 +66,11 @@ class StiebelControl:
             callback=self._can_value_update_callback
         )
         
+        logger.info(f"Loading MQTT configuration from {self.config_file}")
+        logger.debug(f"MQTT configuration: {mqtt_config}")
+        
         # Initialize MQTT interface
+        logger.info(f"Initializing MQTT interface with host: {mqtt_config.get('host', 'localhost')}")
         self.mqtt_interface = MqttInterface(
             host=mqtt_config.get('host', 'localhost'),
             port=mqtt_config.get('port', 1883),
@@ -75,7 +82,15 @@ class StiebelControl:
             command_callback=self._mqtt_command_callback
         )
         
-        # Keep track of registered entities
+        # Connect to MQTT broker
+        logger.info("Attempting to connect to MQTT broker...")
+        mqtt_connected = self.mqtt_interface.connect()
+        if mqtt_connected:
+            logger.info("Successfully connected to MQTT broker")
+        else:
+            logger.error("Failed to connect to MQTT broker, continuing without MQTT functionality")
+            
+        # Register known signals
         self.registered_entities = set()
         
         # Thread for updating values

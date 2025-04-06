@@ -75,41 +75,63 @@ class MqttInterface:
             bool: True if connected successfully, False otherwise
         """
         try:
+            logger.info(f"Attempting to connect to MQTT broker at {self.host}:{self.port}")
+            logger.debug(f"MQTT client ID: {self.client_id}")
+            logger.debug(f"Using username: {'Yes' if self.username else 'No'}")
+            
             self.client.connect(self.host, self.port)
+            logger.info("MQTT connect call made, starting client loop")
             self.client.loop_start()
             
             # Wait for connection to establish
-            for _ in range(5):
+            timeout_seconds = 10  # Increase timeout for potentially slow connections
+            logger.info(f"Waiting up to {timeout_seconds} seconds for MQTT connection to establish")
+            for i in range(timeout_seconds):
                 if self.connected:
+                    logger.info("MQTT connection confirmed")
                     return True
+                logger.debug(f"Waiting for MQTT connection: {i+1}/{timeout_seconds} seconds")
                 time.sleep(1)
                 
-            logger.error(f"Failed to connect to MQTT broker at {self.host}:{self.port}")
+            logger.error(f"Timed out connecting to MQTT broker at {self.host}:{self.port}")
             return False
             
         except Exception as e:
-            logger.error(f"Error connecting to MQTT broker: {e}")
+            logger.error(f"Error connecting to MQTT broker: {e}", exc_info=True)
             return False
             
     def disconnect(self):
         """Disconnect from the MQTT broker."""
+        logger.info("Stopping MQTT client loop")
         self.client.loop_stop()
+        logger.info("Disconnecting from MQTT broker")
         self.client.disconnect()
         self.connected = False
         logger.info("Disconnected from MQTT broker")
         
     def _on_connect(self, client, userdata, flags, rc):
         """Callback for when the client connects to the broker."""
+        rc_messages = {
+            0: "Connection successful",
+            1: "Connection refused - incorrect protocol version",
+            2: "Connection refused - invalid client identifier",
+            3: "Connection refused - server unavailable",
+            4: "Connection refused - bad username or password",
+            5: "Connection refused - not authorized"
+        }
+        
         if rc == 0:
             logger.info(f"Connected to MQTT broker at {self.host}:{self.port}")
             self.connected = True
             
             # Subscribe to command topics
             command_topic = f"{self.base_topic}/+/command"
+            logger.info(f"Subscribing to command topic: {command_topic}")
             client.subscribe(command_topic)
             logger.debug(f"Subscribed to {command_topic}")
         else:
-            logger.error(f"Failed to connect to MQTT broker, return code: {rc}")
+            rc_message = rc_messages.get(rc, f"Unknown error (code {rc})")
+            logger.error(f"Failed to connect to MQTT broker: {rc_message}")
             
     def _on_disconnect(self, client, userdata, rc):
         """Callback for when the client disconnects from the broker."""

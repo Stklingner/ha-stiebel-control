@@ -4,7 +4,7 @@
 
 # Logging configuration
 logging:
-  level: INFO  # INFO, DEBUG, WARNING, ERROR
+  level: DEBUG  # INFO, DEBUG, WARNING, ERROR
 
 # CAN bus configuration
 can:
@@ -13,10 +13,10 @@ can:
 
 # MQTT configuration for Home Assistant
 mqtt:
-  host: 192.168.0.123  # Replace with your MQTT broker IP
+  host: 10.0.1.10  # Replace with your MQTT broker IP
   port: 1883
-  username: mqtt_user  # Replace with your MQTT username
-  password: mqtt_pass  # Replace with your MQTT password
+#  username: mqtt_user  # Replace with your MQTT username
+#  password: mqtt_pass  # Replace with your MQTT password
   client_id: stiebel_control
   discovery_prefix: homeassistant
   base_topic: stiebel_control
