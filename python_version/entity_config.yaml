@@ -60,7 +60,7 @@ entities:
     dhw_comfort_target_temp:
       name: DHW Comfort Target Temperature
       signal: COMFORT_STORAGE_TANK_SETPOINT
-      can_member: KESSEL
+      can_member: PUMP
       device_class: temperature
       state_class: measurement
       unit_of_measurement: °C
@@ -69,7 +69,7 @@ entities:
     dhw_eco_target_temp:
       name: DHW Eco Target Temperature
       signal: ECO_STORAGE_TANK_SETPOINT
-      can_member: KESSEL
+      can_member: PUMP
       device_class: temperature
       state_class: measurement
       unit_of_measurement: °C

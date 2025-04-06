@@ -208,6 +208,10 @@ class CanInterface:
             
         try:
             # Get the CAN member
+            if member_index >= len(self.can_members):
+                logger.error(f"Invalid CAN member index: {member_index}. Available members: {[m.name for m in self.can_members]}")
+                return False
+                
             member = self.can_members[member_index]
             
             # Get the signal definition
@@ -216,6 +220,8 @@ class CanInterface:
                 logger.error(f"Unknown signal: {signal_name}")
                 return False
                 
+            logger.debug(f"Preparing to read signal {signal_name} (index {ei.index}) from member {member.name} (CAN ID 0x{member.can_id:X})")
+            
             # Create the request message
             index_byte1 = (ei.index >> 8) & 0xFF
             index_byte2 = ei.index & 0xFF
