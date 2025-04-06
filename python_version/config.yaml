@@ -30,7 +30,7 @@ entities:
   sensors:
     outside_temp:
       name: Outside Temperature
-      signal: AUSSENTEMP
+      signal: OUTSIDE_TEMP
       can_member: PUMP
       device_class: temperature
       state_class: measurement
@@ -39,7 +39,7 @@ entities:
     
     dhw_temp_actual:
       name: DHW Temperature
-      signal: SPEICHERISTTEMP
+      signal: STORAGE_TANK_INTERNAL_TEMP
       can_member: PUMP
       device_class: temperature
       state_class: measurement
@@ -52,7 +52,7 @@ entities:
     
     dhw_temp_target:
       name: DHW Target Temperature
-      signal: SPEICHERSOLLTEMP
+      signal: STORAGE_TANK_SETPOINT_TEMP
       can_member: PUMP
       device_class: temperature
       state_class: measurement
@@ -61,7 +61,7 @@ entities:
     
     flow_temp_actual:
       name: Flow Temperature
-      signal: VORLAUFISTTEMP
+      signal: FLOW_INTERNAL_TEMP
       can_member: PUMP
       device_class: temperature
       state_class: measurement
@@ -70,7 +70,7 @@ entities:
     
     return_temp_actual:
       name: Return Temperature
-      signal: RUECKLAUFISTTEMP
+      signal: RETURN_FLOW_INTERNAL_TEMP
       can_member: PUMP
       device_class: temperature
       state_class: measurement
@@ -80,7 +80,7 @@ entities:
     # Energy sensors
     heating_dhw_day:
       name: Daily DHW Energy
-      signal: HEIZLEISTUNG_TAG_KWH
+      signal: HEATING_ENERGY_DAY_KWH
       can_member: PUMP
       device_class: energy
       state_class: total_increasing
@@ -89,7 +89,7 @@ entities:
     
     electricity_intake_dhw_day:
       name: Daily DHW Electricity Consumption
-      signal: EL_AUFNAHMELEISTUNG_WW_TAG_KWH
+      signal: ELECTRICITY_INTAKE_DHW_DAY_KWH
       can_member: PUMP
       device_class: energy
       state_class: total_increasing
@@ -98,7 +98,7 @@ entities:
     
     electricity_intake_heating_day:
       name: Daily Heating Electricity Consumption
-      signal: EL_AUFNAHMELEISTUNG_HEIZEN_TAG_KWH
+      signal: ELECTRICITY_INTAKE_HEATING_DAY_KWH
       can_member: PUMP
       device_class: energy
       state_class: total_increasing
@@ -122,7 +122,7 @@ entities:
   selects:
     program_switch:
       name: Program Switch
-      signal: PROGRAMMSCHALTER
+      signal: PROGRAM_SWITCH
       can_member: MANAGER
       options:
         - Emergency
@@ -148,7 +148,7 @@ entities:
         type: sequence
         actions:
           - type: write_signal
-            signal: STUNDE
+            signal: HOUR
             can_member: MANAGER
             value: "${%H}"  # Current hour
             delay: 0.5
@@ -158,16 +158,16 @@ entities:
             value: "${%M}"  # Current minute
             delay: 0.5
           - type: write_signal
-            signal: TAG
+            signal: DAY
             can_member: MANAGER
             value: "${%d}"  # Current day
             delay: 0.5
           - type: write_signal
-            signal: MONAT
+            signal: MONTH
             can_member: MANAGER
             value: "${%m}"  # Current month
             delay: 0.5
           - type: write_signal
-            signal: JAHR
+            signal: YEAR
             can_member: MANAGER
             value: "${%Y}"  # Current year
