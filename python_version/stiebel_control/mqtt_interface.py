@@ -361,28 +361,34 @@ class MqttInterface:
             return False
             
         if entity_id not in self.entities:
-            logger.warning(f"Entity {entity_id} not registered")
+            logger.warning(f"Entity {entity_id} not registered, cannot publish state")
             return False
             
         try:
             # Get the state topic for this entity
             entity_info = self.entities[entity_id]
+            logger.debug(f"Entity info for {entity_id}: {entity_info}")
+            
             if "state_topic" not in entity_info:
                 logger.warning(f"Entity {entity_id} has no state topic")
                 return False
                 
             state_topic = entity_info["state_topic"]
+            logger.debug(f"Publishing to topic {state_topic}")
             
             # Convert state to string if necessary
             if not isinstance(state, str):
                 state = str(state)
                 
             # Publish the state
-            self.client.publish(state_topic, state, qos=1)
-            logger.debug(f"Published state for {entity_id}: {state}")
+            result = self.client.publish(state_topic, state, qos=1)
+            if result.rc == 0:
+                logger.info(f"Published state for {entity_id}: {state}")
+            else:
+                logger.warning(f"Failed to publish state for {entity_id}, return code: {result.rc}")
             
-            return True
+            return result.rc == 0
             
         except Exception as e:
-            logger.error(f"Error publishing state: {e}")
+            logger.error(f"Error publishing state: {e}", exc_info=True)
             return False

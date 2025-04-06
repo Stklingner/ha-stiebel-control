@@ -134,27 +134,42 @@ class StiebelControl:
         Returns:
             bool: True if started successfully, False otherwise
         """
+        logger.info("Starting Stiebel Control application")
+        
         # Start CAN interface
+        logger.info("Starting CAN interface")
         if not self.can_interface.start():
             logger.error("Failed to start CAN interface")
             return False
+        logger.info("CAN interface started successfully")
             
         # Start MQTT interface
+        logger.info("Connecting to MQTT broker")
         if not self.mqtt_interface.connect():
             logger.error("Failed to connect to MQTT broker")
             self.can_interface.stop()
             return False
+        logger.info("MQTT broker connected successfully")
             
         # Register entities with Home Assistant
+        logger.info("Registering entities with Home Assistant")
         self._register_entities()
+        logger.info(f"Entity registration complete, registered {len(self.registered_entities)} entities")
         
         # Start update thread
+        logger.info("Starting update thread")
         self.running = True
         self.update_thread = threading.Thread(target=self._update_loop)
         self.update_thread.daemon = True
         self.update_thread.start()
+        logger.info("Update thread started")
         
-        logger.info("Stiebel Control started")
+        logger.info("Stiebel Control started successfully")
+        
+        # Request an initial refresh of all values
+        logger.info("Requesting initial value refresh")
+        self._refresh_all_entities()
+        
         return True
         
     def stop(self):
@@ -172,6 +187,8 @@ class StiebelControl:
         """Register entities with Home Assistant via MQTT discovery."""
         entities_config = self.config.get('entities', {})
         
+        logger.info(f"Starting entity registration with Home Assistant")
+        
         # Register sensors
         for sensor_id, sensor_config in entities_config.get('sensors', {}).items():
             logger.debug(f"Registering sensor {sensor_id}")
@@ -183,7 +200,8 @@ class StiebelControl:
                 continue
                 
             # Register with MQTT
-            self.mqtt_interface.register_sensor(
+            logger.info(f"Registering sensor {sensor_id} for signal {signal_name}")
+            registered = self.mqtt_interface.register_sensor(
                 entity_id=sensor_id,
                 name=sensor_config.get('name', sensor_id),
                 device_class=sensor_config.get('device_class'),
@@ -192,6 +210,11 @@ class StiebelControl:
                 icon=sensor_config.get('icon')
             )
             
+            if registered:
+                logger.info(f"Successfully registered sensor {sensor_id}")
+            else:
+                logger.warning(f"Failed to register sensor {sensor_id}")
+                
             # Add to registered entities
             self.registered_entities.add(sensor_id)
             
@@ -206,13 +229,19 @@ class StiebelControl:
                 continue
                 
             # Register with MQTT
-            self.mqtt_interface.register_select(
+            logger.info(f"Registering select {select_id} for signal {signal_name}")
+            registered = self.mqtt_interface.register_select(
                 entity_id=select_id,
                 name=select_config.get('name', select_id),
                 options=select_config.get('options', []),
                 icon=select_config.get('icon')
             )
             
+            if registered:
+                logger.info(f"Successfully registered select {select_id}")
+            else:
+                logger.warning(f"Failed to register select {select_id}")
+                
             # Add to registered entities
             self.registered_entities.add(select_id)
             
@@ -221,12 +250,18 @@ class StiebelControl:
             logger.debug(f"Registering button {button_id}")
             
             # Register with MQTT
-            self.mqtt_interface.register_button(
+            logger.info(f"Registering button {button_id}")
+            registered = self.mqtt_interface.register_button(
                 entity_id=button_id,
                 name=button_config.get('name', button_id),
                 icon=button_config.get('icon')
             )
             
+            if registered:
+                logger.info(f"Successfully registered button {button_id}")
+            else:
+                logger.warning(f"Failed to register button {button_id}")
+                
             # Add to registered entities
             self.registered_entities.add(button_id)
             
@@ -286,12 +321,16 @@ class StiebelControl:
             signal_name: Name of the signal
             value: New value
         """
+        logger.info(f"Received CAN value update for signal {signal_name}: {value}")
+        
         # Find entities that use this signal and update them
         entities_config = self.config.get('entities', {})
         
         # Check sensors
         for sensor_id, sensor_config in entities_config.get('sensors', {}).items():
             if sensor_config.get('signal') == signal_name:
+                logger.debug(f"Updating sensor {sensor_id} with value {value}")
+                
                 # Apply any transformations if configured
                 transformed_value = self._apply_transformation(value, sensor_config.get('transform'))
                 
@@ -304,6 +343,8 @@ class StiebelControl:
         # Check selects
         for select_id, select_config in entities_config.get('selects', {}).items():
             if select_config.get('signal') == signal_name:
+                logger.debug(f"Updating select {select_id} with value {value}")
+                
                 # Selects don't have transformations
                 
                 # Update the cache
