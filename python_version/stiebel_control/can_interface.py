@@ -44,15 +44,16 @@ class CanInterface:
     including message formatting and parsing.
     """
     
-    # Default CAN members definition based on the original C++ code
+    # Default CAN members definition based on the WPL13E configuration from the C++ code
     DEFAULT_CAN_MEMBERS = [
-        # Name,       CAN ID,  Read ID,      Write ID,     Confirmation ID
-        CanMember("ESPCLIENT", 0x680, (0x00, 0x00), (0x00, 0x00), (0xE2, 0x00)),
-        CanMember("PUMP",      0x180, (0x31, 0x00), (0x30, 0x00)),
-        CanMember("FE7X",      0x301, (0x61, 0x01), (0x00, 0x00)),
-        CanMember("FEK",       0x302, (0x61, 0x02), (0x00, 0x00)),
-        CanMember("MANAGER",   0x480, (0x91, 0x00), (0x90, 0x00)),
-        CanMember("FE7",       0x602, (0xC1, 0x02), (0x00, 0x00)),
+        # Name,        CAN ID,  Read ID,      Write ID,     Confirmation ID
+        CanMember("ESPCLIENT", 0x680, (0x00, 0x00), (0x00, 0x00), (0xE2, 0x00)),  # The ESP Home Client
+        CanMember("PUMP",      0x180, (0x31, 0x00), (0x30, 0x00), (0x00, 0x00)),
+        CanMember("FE7X",      0x301, (0x61, 0x01), (0x00, 0x00), (0x00, 0x00)),
+        CanMember("FEK",       0x302, (0x61, 0x02), (0x00, 0x00), (0x00, 0x00)),
+        CanMember("MANAGER",   0x480, (0x91, 0x00), (0x90, 0x00), (0x00, 0x00)),
+        CanMember("HEATING",   0x500, (0xA1, 0x00), (0xA0, 0x00), (0x00, 0x00)),  # Heating Module
+        CanMember("FE7",       0x602, (0xC1, 0x02), (0x00, 0x00), (0x00, 0x00)),
     ]
     
     # CAN member indices for easier reference
@@ -61,7 +62,8 @@ class CanInterface:
     CM_FE7X = 2
     CM_FEK = 3
     CM_MANAGER = 4
-    CM_FE7 = 5
+    CM_HEATING = 5
+    CM_FE7 = 6
     
     def __init__(self, can_interface: str = 'can0', 
                  can_members: List[CanMember] = None, 

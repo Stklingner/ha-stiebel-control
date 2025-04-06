@@ -97,7 +97,7 @@ After=network.target
 [Service]
 User=your_user
 WorkingDirectory=/path/to/stiebel-control-python
-ExecStart=/usr/bin/python3 -m stiebel_control.main --config service_config.yaml
+ExecStart=/usr/bin/python3 -m stiebel_control --config service_config.yaml
 Restart=on-failure
 RestartSec=5
 
