@@ -326,11 +326,28 @@ class StiebelControl:
         # Find entities that use this signal and update them
         entities_config = self.config.get('entities', {})
         
+        # Create a list of all configured signal names for easy debugging
+        if not hasattr(self, '_signal_map_logged'):
+            all_signals = set()
+            for sensor_id, sensor_config in entities_config.get('sensors', {}).items():
+                signal = sensor_config.get('signal')
+                if signal:
+                    all_signals.add(signal)
+            for select_id, select_config in entities_config.get('selects', {}).items():
+                signal = select_config.get('signal')
+                if signal:
+                    all_signals.add(signal)
+            logger.info(f"Configured signals in config.yaml: {sorted(list(all_signals))}")
+            self._signal_map_logged = True
+        
+        match_found = False
+        
         # Check sensors
         for sensor_id, sensor_config in entities_config.get('sensors', {}).items():
-            if sensor_config.get('signal') == signal_name:
-                logger.debug(f"Updating sensor {sensor_id} with value {value}")
-                
+            config_signal = sensor_config.get('signal')
+            if config_signal == signal_name:
+                match_found = True
+                logger.info(f"Found matching sensor {sensor_id} for signal {signal_name}")
                 # Apply any transformations if configured
                 transformed_value = self._apply_transformation(value, sensor_config.get('transform'))
                 
@@ -338,21 +355,35 @@ class StiebelControl:
                 self.value_cache[sensor_id] = transformed_value
                 
                 # Publish to MQTT
-                self.mqtt_interface.publish_state(sensor_id, transformed_value)
+                logger.info(f"Publishing sensor {sensor_id} = {transformed_value} to MQTT")
+                published = self.mqtt_interface.publish_state(sensor_id, transformed_value)
+                if published:
+                    logger.info(f"Successfully published {sensor_id} state")
+                else:
+                    logger.warning(f"Failed to publish {sensor_id} state")
                 
         # Check selects
         for select_id, select_config in entities_config.get('selects', {}).items():
-            if select_config.get('signal') == signal_name:
-                logger.debug(f"Updating select {select_id} with value {value}")
-                
+            config_signal = select_config.get('signal')
+            if config_signal == signal_name:
+                match_found = True
+                logger.info(f"Found matching select {select_id} for signal {signal_name}")
                 # Selects don't have transformations
                 
                 # Update the cache
                 self.value_cache[select_id] = value
                 
                 # Publish to MQTT
-                self.mqtt_interface.publish_state(select_id, value)
+                logger.info(f"Publishing select {select_id} = {value} to MQTT")
+                published = self.mqtt_interface.publish_state(select_id, value)
+                if published:
+                    logger.info(f"Successfully published {select_id} state")
+                else:
+                    logger.warning(f"Failed to publish {select_id} state")
                 
+        if not match_found:
+            logger.debug(f"No entity matches found for signal {signal_name}")
+        
     def _mqtt_command_callback(self, entity_id: str, command: str):
         """
         Callback for when a command is received via MQTT.
