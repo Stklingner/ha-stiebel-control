@@ -1,0 +1,173 @@
+###############################################
+# Stiebel Eltron Heat Pump Control Configuration
+###############################################
+
+# Logging configuration
+logging:
+  level: INFO  # INFO, DEBUG, WARNING, ERROR
+
+# CAN bus configuration
+can:
+  interface: can0
+  bitrate: 20000  # 20 kbps for Stiebel Eltron heat pumps
+
+# MQTT configuration for Home Assistant
+mqtt:
+  host: 192.168.0.123  # Replace with your MQTT broker IP
+  port: 1883
+  username: mqtt_user  # Replace with your MQTT username
+  password: mqtt_pass  # Replace with your MQTT password
+  client_id: stiebel_control
+  discovery_prefix: homeassistant
+  base_topic: stiebel_control
+
+# Global update interval (seconds)
+update_interval: 60
+
+# Entity definitions for sensors, buttons, and selects
+entities:
+  # Temperature sensors
+  sensors:
+    outside_temp:
+      name: Outside Temperature
+      signal: AUSSENTEMP
+      can_member: PUMP
+      device_class: temperature
+      state_class: measurement
+      unit_of_measurement: °C
+      icon: mdi:thermometer-lines
+    
+    dhw_temp_actual:
+      name: DHW Temperature
+      signal: SPEICHERISTTEMP
+      can_member: PUMP
+      device_class: temperature
+      state_class: measurement
+      unit_of_measurement: °C
+      icon: mdi:thermometer-lines
+      # Add offset correction if needed
+      transform:
+        type: scale
+        offset: 3.9  # add 3.9°C offset
+    
+    dhw_temp_target:
+      name: DHW Target Temperature
+      signal: SPEICHERSOLLTEMP
+      can_member: PUMP
+      device_class: temperature
+      state_class: measurement
+      unit_of_measurement: °C
+      icon: mdi:thermometer-lines
+    
+    flow_temp_actual:
+      name: Flow Temperature
+      signal: VORLAUFISTTEMP
+      can_member: PUMP
+      device_class: temperature
+      state_class: measurement
+      unit_of_measurement: °C
+      icon: mdi:thermometer-lines
+    
+    return_temp_actual:
+      name: Return Temperature
+      signal: RUECKLAUFISTTEMP
+      can_member: PUMP
+      device_class: temperature
+      state_class: measurement
+      unit_of_measurement: °C
+      icon: mdi:waves-arrow-left
+    
+    # Energy sensors
+    heating_dhw_day:
+      name: Daily DHW Energy
+      signal: HEIZLEISTUNG_TAG_KWH
+      can_member: PUMP
+      device_class: energy
+      state_class: total_increasing
+      unit_of_measurement: kWh
+      icon: mdi:water-boiler
+    
+    electricity_intake_dhw_day:
+      name: Daily DHW Electricity Consumption
+      signal: EL_AUFNAHMELEISTUNG_WW_TAG_KWH
+      can_member: PUMP
+      device_class: energy
+      state_class: total_increasing
+      unit_of_measurement: kWh
+      icon: mdi:flash
+    
+    electricity_intake_heating_day:
+      name: Daily Heating Electricity Consumption
+      signal: EL_AUFNAHMELEISTUNG_HEIZEN_TAG_KWH
+      can_member: PUMP
+      device_class: energy
+      state_class: total_increasing
+      unit_of_measurement: kWh
+      icon: mdi:flash
+    
+    # Calculated COP (Coefficient of Performance)
+    cop_water:
+      name: DHW COP
+      # This is a virtual sensor, updated through custom logic
+      device_class: power_factor
+      state_class: measurement
+      unit_of_measurement: ""
+      icon: mdi:chart-line
+      # Example of a formula transformation using other sensor values
+      transform:
+        type: formula
+        formula: "self.value_cache.get('heating_dhw_day', 0) / max(self.value_cache.get('electricity_intake_dhw_day', 1), 0.01)"
+    
+  # Select controls (for enum values)
+  selects:
+    program_switch:
+      name: Program Switch
+      signal: PROGRAMMSCHALTER
+      can_member: MANAGER
+      options:
+        - Emergency
+        - Standby
+        - Automatic
+        - Day mode
+        - Night mode
+        - DHW
+      icon: mdi:tune-vertical
+  
+  # Button controls
+  buttons:
+    refresh_all:
+      name: Refresh Values
+      icon: mdi:refresh
+      action: refresh_all
+    
+    update_time:
+      name: Update Time
+      icon: mdi:clock-outline
+      action: custom
+      custom_action:
+        type: sequence
+        actions:
+          - type: write_signal
+            signal: STUNDE
+            can_member: MANAGER
+            value: "${%H}"  # Current hour
+            delay: 0.5
+          - type: write_signal
+            signal: MINUTE
+            can_member: MANAGER
+            value: "${%M}"  # Current minute
+            delay: 0.5
+          - type: write_signal
+            signal: TAG
+            can_member: MANAGER
+            value: "${%d}"  # Current day
+            delay: 0.5
+          - type: write_signal
+            signal: MONAT
+            can_member: MANAGER
+            value: "${%m}"  # Current month
+            delay: 0.5
+          - type: write_signal
+            signal: JAHR
+            can_member: MANAGER
+            value: "${%Y}"  # Current year

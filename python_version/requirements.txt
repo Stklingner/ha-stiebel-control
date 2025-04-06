@@ -1,0 +1,4 @@
+python-can>=4.2.2
+paho-mqtt>=2.2.1
+PyYAML>=6.0
+python-dotenv>=1.0.0
