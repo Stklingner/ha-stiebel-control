@@ -200,6 +200,23 @@ class ElsterType(Enum):
     ET_PROGRAM_TEXT = auto()
 
 
+# Import enum values into global namespace for backward compatibility
+ET_INTEGER = ElsterType.ET_INTEGER
+ET_BOOLEAN = ElsterType.ET_BOOLEAN
+ET_TEMPERATURE = ElsterType.ET_TEMPERATURE
+ET_DOUBLE_VALUE = ElsterType.ET_DOUBLE_VALUE
+ET_TRIPLE_VALUE = ElsterType.ET_TRIPLE_VALUE
+ET_HOUR = ElsterType.ET_HOUR
+ET_HOUR_SHORT = ElsterType.ET_HOUR_SHORT
+ET_DATE = ElsterType.ET_DATE
+ET_PERCENT = ElsterType.ET_PERCENT
+ET_KELVIN = ElsterType.ET_KELVIN
+ET_PRESSURE = ElsterType.ET_PRESSURE
+ET_MODE = ElsterType.ET_MODE
+ET_PROGRAM_SWITCH = ElsterType.ET_PROGRAM_SWITCH
+ET_PROGRAM_TEXT = ElsterType.ET_PROGRAM_TEXT
+
+
 class ElsterIndex:
     """Class representing an Elster signal index with metadata."""
     
