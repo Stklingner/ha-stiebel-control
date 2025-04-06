@@ -45,29 +45,40 @@ This project enables monitoring and controlling Stiebel Eltron Heat Pumps via a 
    sudo ip link set up can0
    ```
 
-4. Edit the `config.yaml` file to match your setup:
-   - Update MQTT broker details
-   - Configure desired sensors and controls
+4. Edit the configuration files to match your setup:
+   - Update MQTT broker details in `service_config.yaml`
+   - Configure desired sensors and controls in `entity_config.yaml`
    - Adjust CAN bus parameters if needed
 
 ## Configuration
 
-The system is configured through the `config.yaml` file. This file defines:
+The system is configured through two separate files:
 
+### Service Configuration (`service_config.yaml`)
+
+This file defines the core service settings:
+- Logging levels
 - CAN bus parameters
 - MQTT connection settings
+- Reference to the entity configuration file
+
+### Entity Configuration (`entity_config.yaml`) 
+
+This file defines all entities exposed to Home Assistant:
 - Sensors and their mappings to heat pump signals
 - Controls for changing settings
 - Transformation rules for sensor data
 
-See the included `config.yaml` for a comprehensive example.
+This separation allows for easier maintenance and reuse of entity configurations across different installations.
+
+See the included configuration files for comprehensive examples.
 
 ## Usage
 
 Start the application:
 
 ```bash
-python -m stiebel_control.main --config config.yaml
+python -m stiebel_control.main --config service_config.yaml
 ```
 
 For automatic startup, you can create a systemd service:
@@ -86,7 +97,7 @@ After=network.target
 [Service]
 User=your_user
 WorkingDirectory=/path/to/stiebel-control-python
-ExecStart=/usr/bin/python3 -m stiebel_control.main --config config.yaml
+ExecStart=/usr/bin/python3 -m stiebel_control.main --config service_config.yaml
 Restart=on-failure
 RestartSec=5
 
@@ -176,7 +187,7 @@ views:
   ```bash
   journalctl -u stiebel-control.service
   ```
-- Increase log level in config.yaml to DEBUG for more details
+- Increase log level in `service_config.yaml` to DEBUG for more details
 
 ## Project Structure
 

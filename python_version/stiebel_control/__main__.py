@@ -15,7 +15,7 @@ def main():
     """Main entry point for the stiebel_control package when run as a module."""
     parser = argparse.ArgumentParser(description='Stiebel Eltron heat pump control')
     parser.add_argument('--config', dest='config_file', 
-                        default='config.yaml',
+                        default='service_config.yaml',
                         help='Path to configuration file')
     args = parser.parse_args()
     

@@ -114,6 +114,7 @@ class StiebelControl:
                 logger.error(f"Configuration file {self.config_file} not found")
                 return {}
             
+            # Load the main service configuration
             with open(self.config_file, 'r') as f:
                 if self.config_file.endswith('.yaml') or self.config_file.endswith('.yml'):
                     config = yaml.safe_load(f)
@@ -122,11 +123,38 @@ class StiebelControl:
                 else:
                     logger.error(f"Unsupported configuration file format: {self.config_file}")
                     return {}
+            
+            logger.info(f"Loaded service configuration from {self.config_file}")
+            
+            # Check if there's a separate entity configuration file
+            entity_config_file = config.get('entity_config')
+            if entity_config_file:
+                # If entity_config is a relative path, resolve it relative to the main config file
+                if not os.path.isabs(entity_config_file):
+                    config_dir = os.path.dirname(os.path.abspath(self.config_file))
+                    entity_config_file = os.path.join(config_dir, entity_config_file)
                 
-            logger.info(f"Loaded configuration from {self.config_file}")
+                if os.path.exists(entity_config_file):
+                    with open(entity_config_file, 'r') as f:
+                        if entity_config_file.endswith('.yaml') or entity_config_file.endswith('.yml'):
+                            entity_config = yaml.safe_load(f)
+                        elif entity_config_file.endswith('.json'):
+                            entity_config = json.load(f)
+                        else:
+                            logger.error(f"Unsupported entity configuration file format: {entity_config_file}")
+                            return config
+                    
+                    # Merge the entity configuration into the main configuration
+                    if 'entities' in entity_config:
+                        config['entities'] = entity_config['entities']
+                    
+                    logger.info(f"Loaded entity configuration from {entity_config_file}")
+                else:
+                    logger.warning(f"Entity configuration file {entity_config_file} not found")
+            
             return config
         except Exception as e:
-            logger.error(f"Error loading configuration: {e}")
+            logger.error(f"Error loading configuration: {e}", exc_info=True)
             return {}
             
     def start(self) -> bool:
@@ -318,7 +346,7 @@ class StiebelControl:
             signal_name: Name of the signal
             value: New value
         """
-        logger.info(f"Received CAN value update for signal {signal_name}: {value}")
+        logger.debug(f"Received CAN value update for signal {signal_name}: {value}")
         
         # Find entities that use this signal and update them
         entities_config = self.config.get('entities', {})
@@ -334,7 +362,7 @@ class StiebelControl:
                 signal = select_config.get('signal')
                 if signal:
                     all_signals.add(signal)
-            logger.info(f"Configured signals in config.yaml: {sorted(list(all_signals))}")
+            logger.info(f"Configured signals in the configuration: {sorted(list(all_signals))}")
             self._signal_map_logged = True
         
         match_found = False
@@ -344,7 +372,7 @@ class StiebelControl:
             config_signal = sensor_config.get('signal')
             if config_signal == signal_name:
                 match_found = True
-                logger.info(f"Found matching sensor {sensor_id} for signal {signal_name}")
+                logger.debug(f"Found matching sensor {sensor_id} for signal {signal_name}")
                 # Apply any transformations if configured
                 transformed_value = self._apply_transformation(value, sensor_config.get('transform'))
                 
@@ -352,10 +380,10 @@ class StiebelControl:
                 self.value_cache[sensor_id] = transformed_value
                 
                 # Publish to MQTT
-                logger.info(f"Publishing sensor {sensor_id} = {transformed_value} to MQTT")
+                logger.debug(f"Publishing sensor {sensor_id} = {transformed_value} to MQTT")
                 published = self.mqtt_interface.publish_state(sensor_id, transformed_value)
                 if published:
-                    logger.info(f"Successfully published {sensor_id} state")
+                    logger.debug(f"Successfully published {sensor_id} state")
                 else:
                     logger.warning(f"Failed to publish {sensor_id} state")
                 
@@ -364,17 +392,17 @@ class StiebelControl:
             config_signal = select_config.get('signal')
             if config_signal == signal_name:
                 match_found = True
-                logger.info(f"Found matching select {select_id} for signal {signal_name}")
+                logger.debug(f"Found matching select {select_id} for signal {signal_name}")
                 # Selects don't have transformations
                 
                 # Update the cache
                 self.value_cache[select_id] = value
                 
                 # Publish to MQTT
-                logger.info(f"Publishing select {select_id} = {value} to MQTT")
+                logger.debug(f"Publishing select {select_id} = {value} to MQTT")
                 published = self.mqtt_interface.publish_state(select_id, value)
                 if published:
-                    logger.info(f"Successfully published {select_id} state")
+                    logger.debug(f"Successfully published {select_id} state")
                 else:
                     logger.warning(f"Failed to publish {select_id} state")
                 
@@ -569,7 +597,7 @@ def main():
     """Main entry point for the application."""
     parser = argparse.ArgumentParser(description='Stiebel Eltron heat pump control')
     parser.add_argument('--config', dest='config_file', 
-                        default='config.yaml',
+                        default='service_config.yaml',
                         help='Path to configuration file')
     args = parser.parse_args()
     

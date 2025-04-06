@@ -1,0 +1,28 @@
+###############################################
+# Stiebel Eltron Heat Pump Control - Service Configuration
+###############################################
+
+# Logging configuration
+logging:
+  level: DEBUG  # INFO, DEBUG, WARNING, ERROR
+
+# CAN bus configuration
+can:
+  interface: can0
+  bitrate: 20000  # 20 kbps for Stiebel Eltron heat pumps
+
+# MQTT configuration for Home Assistant
+mqtt:
+  host: 10.0.1.10
+  port: 1883
+#  username: mqtt_user
+#  password: mqtt_pass
+  client_id: stiebel_control
+  discovery_prefix: homeassistant
+  base_topic: stiebel_control
+
+# Global update interval (seconds)
+update_interval: 60
+
+# Path to entity configuration file
+entity_config: entity_config.yaml
