@@ -69,7 +69,7 @@ class StiebelControl:
         try:
             logger.info(f"Initializing CAN interface {interface_name} at {bitrate} bps")
             self.can_interface = CanInterface(
-                interface=interface_name,
+                can_interface=interface_name,
                 bitrate=bitrate
             )
         except Exception as e:
