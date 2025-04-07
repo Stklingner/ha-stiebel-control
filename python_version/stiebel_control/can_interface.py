@@ -101,8 +101,14 @@ class CanInterface:
             self.running = True
             logger.info(f"CAN interface started on {self.can_interface}")
             
-            # Start the message receiver
-            self._receive_messages()
+            # Start the message receiver in a separate thread
+            import threading
+            self.receiver_thread = threading.Thread(
+                target=self._receive_messages,
+                daemon=True  # Allow the thread to exit when the main program exits
+            )
+            self.receiver_thread.start()
+            logger.info("CAN message receiver thread started")
             
             return True
         except Exception as e:
