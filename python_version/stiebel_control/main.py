@@ -108,8 +108,9 @@ class StiebelControl:
         # so we need to set the callback attribute directly
         self.can_interface.callback = self.signal_processor.process_signal
         
-        # Register MQTT command callback
-        self.mqtt_interface.set_command_callback(self.signal_processor.handle_command)
+        # Set the MQTT command callback
+        # The MqttInterface uses a direct attribute rather than a setter method
+        self.mqtt_interface.command_callback = self.signal_processor.handle_command
         
         logger.debug("Callbacks set up")
         
