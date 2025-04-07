@@ -68,6 +68,8 @@ class StiebelControl:
         
         try:
             logger.info(f"Initializing CAN interface {interface_name} at {bitrate} bps")
+            # We'll initialize the CAN interface without a callback first
+            # and set it later after signal_processor is initialized
             self.can_interface = CanInterface(
                 can_interface=interface_name,
                 bitrate=bitrate
@@ -101,8 +103,10 @@ class StiebelControl:
         """
         Set up callbacks between components.
         """
-        # Register CAN update callback
-        self.can_interface.register_callback(self.signal_processor.process_signal)
+        # Set the callback for the CAN interface
+        # The CAN interface doesn't have a register_callback method,
+        # so we need to set the callback attribute directly
+        self.can_interface.callback = self.signal_processor.process_signal
         
         # Register MQTT command callback
         self.mqtt_interface.set_command_callback(self.signal_processor.handle_command)
@@ -116,6 +120,10 @@ class StiebelControl:
         logger.info("Starting Stiebel Control")
         
         try:
+            # Connect to the CAN bus
+            if hasattr(self, 'can_interface'):
+                self.can_interface.start()
+                
             # Build entity mapping
             self.entity_manager.build_entity_mapping(self.can_interface)
             

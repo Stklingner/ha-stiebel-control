@@ -22,21 +22,19 @@ def main():
     # Initialize and start the application
     app = StiebelControl(args.config_file)
     
-    # Explicitly start the application
-    if app.start():
-        try:
-            # Run until interrupted
-            logger.info("Stiebel Control running, press Ctrl+C to stop")
-            while True:
-                import time
-                time.sleep(1)
-        except KeyboardInterrupt:
-            logger.info("Interrupted by user")
-        finally:
-            app.stop()
-    else:
-        logger.error("Failed to start application")
+    # Start the application
+    try:
+        app.start()
+    except KeyboardInterrupt:
+        logger.info("Application interrupted by user")
+    except Exception as e:
+        logger.error(f"Application error: {e}")
         sys.exit(1)
+    finally:
+        # Ensure proper cleanup
+        app.stop()
+        
+    sys.exit(0)
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
