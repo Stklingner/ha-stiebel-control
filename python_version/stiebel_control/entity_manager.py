@@ -283,8 +283,9 @@ class EntityManager:
         can_id_to_name = {
             0x180: "PUMP",
             0x480: "MANAGER",
-            0x301: "FE7X",
+            0x301: "FE7X", 
             0x302: "FEK",
+            0x500: "HEATING",  # Heating Module (0x500)
             0x602: "FE7",
             0x680: "ESPCLIENT"
         }
