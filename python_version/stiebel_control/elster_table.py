@@ -225,11 +225,19 @@ def translate_value(value, value_type):
     elif value_type == ElsterType.ET_BOOLEAN:
         return bool(value)
     elif value_type == ElsterType.ET_TEMPERATURE:
-        return value / 10  # Temperature values are scaled by 10
+        # Handle temperature as signed value (convert to signed 16-bit)
+        if value > 32767:  # If high bit is set, it's negative
+            signed_value = value - 65536
+            return signed_value / 10.0
+        return value / 10.0  # Temperature values are scaled by 10
     elif value_type == ElsterType.ET_DOUBLE_VALUE or value_type == ElsterType.ET_TRIPLE_VALUE:
-        return value / 10  # Double/triple values are scaled by 10
+        # These may also need signed handling
+        if value > 32767:  # If high bit is set, it's negative
+            signed_value = value - 65536
+            return signed_value / 10.0
+        return value / 10.0  # Double/triple values are scaled by 10
     elif value_type == ElsterType.ET_PERCENT:
-        return value / 10  # Percent values are scaled by 10
+        return value / 10.0  # Percent values are scaled by 10
     elif value_type == ElsterType.ET_PROGRAM_SWITCH:
         # Use the BetriebsartList if available
         if 'BETRIEBSARTLIST' in globals():
@@ -275,11 +283,24 @@ def translate_string_to_value(string_value, value_type):
     elif value_type == ElsterType.ET_BOOLEAN:
         return 1 if string_value.lower() in ["true", "1", "on", "yes"] else 0
     elif value_type == ElsterType.ET_TEMPERATURE:
-        return int(float(string_value) * 10)  # Temperature values are scaled by 10
+        # Multiply by 10 to store as fixed-point
+        # If negative, will be properly encoded as 16-bit signed
+        float_val = float(string_value) * 10
+        # Convert to 16-bit signed integer representation if needed
+        if float_val < 0:
+            return int(float_val) & 0xFFFF  # Convert to 16-bit unsigned representation of signed value
+        return int(float_val)
     elif value_type == ElsterType.ET_DOUBLE_VALUE or value_type == ElsterType.ET_TRIPLE_VALUE:
-        return int(float(string_value) * 10)  # Double/triple values are scaled by 10
+        # Multiply by 10 to store as fixed-point
+        float_val = float(string_value) * 10
+        # Convert to 16-bit signed integer representation if needed
+        if float_val < 0:
+            return int(float_val) & 0xFFFF  # Convert to 16-bit unsigned representation of signed value
+        return int(float_val)
     elif value_type == ElsterType.ET_PERCENT:
-        return int(float(string_value) * 10)  # Percent values are scaled by 10
+        # Percent values are scaled by 10
+        float_val = float(string_value) * 10
+        return int(float_val)
     elif value_type == ElsterType.ET_PROGRAM_SWITCH:
         # Use the BetriebsartList if available
         if 'BETRIEBSARTLIST' in globals():
