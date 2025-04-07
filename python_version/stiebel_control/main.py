@@ -303,29 +303,63 @@ class StiebelControl:
         # Build entity map for sensors
         for sensor_id, sensor_config in entities_config.get('sensors', {}).items():
             signal_name = sensor_config.get('signal')
-            can_member = sensor_config.get('can_member', 'PUMP')
+            
+            # Get the list of CAN members for this sensor
+            if 'can_members' in sensor_config:
+                can_members = sensor_config.get('can_members', ['PUMP'])
+                primary_member = can_members[0] if can_members else 'PUMP'
+            else:
+                primary_member = sensor_config.get('can_member', 'PUMP')
+                
+            # Get any additional CAN member IDs to check
+            additional_can_ids = []
+            if 'additional_can_members' in sensor_config:
+                for member_name in sensor_config.get('additional_can_members', []):
+                    member_index = self._get_can_member_index(member_name)
+                    if member_index is not None:
+                        member = self.can_interface.can_members[member_index]
+                        additional_can_ids.append(member.can_id)
             
             if signal_name:
-                # Convert CAN member name to index
-                member_index = self._get_can_member_index(can_member)
+                # Convert primary CAN member name to index
+                member_index = self._get_can_member_index(primary_member)
                 if member_index is not None:
-                    entity_map[sensor_id] = (member_index, signal_name)
+                    entity_map[sensor_id] = (member_index, signal_name, additional_can_ids)
         
         # Build entity map for selects
         for select_id, select_config in entities_config.get('selects', {}).items():
             signal_name = select_config.get('signal')
-            can_member = select_config.get('can_member', 'PUMP')
+            
+            # Get the list of CAN members for this select
+            if 'can_members' in select_config:
+                # New format with list of CAN members
+                can_members = select_config.get('can_members', ['PUMP'])
+                primary_member = can_members[0] if can_members else 'PUMP'
+            else:
+                # Legacy format with single primary CAN member
+                primary_member = select_config.get('can_member', 'PUMP')
+                additional_members = select_config.get('additional_can_members', [])
+                can_members = [primary_member] + additional_members
+            
+            # Get any additional CAN member IDs to check
+            additional_can_ids = []
+            if 'additional_can_members' in select_config:
+                for member_name in select_config.get('additional_can_members', []):
+                    member_index = self._get_can_member_index(member_name)
+                    if member_index is not None:
+                        member = self.can_interface.can_members[member_index]
+                        additional_can_ids.append(member.can_id)
             
             if signal_name:
                 # Convert CAN member name to index
-                member_index = self._get_can_member_index(can_member)
+                member_index = self._get_can_member_index(primary_member)
                 if member_index is not None:
-                    entity_map[select_id] = (member_index, signal_name)
+                    entity_map[select_id] = (member_index, signal_name, additional_can_ids)
         
         while self.running:
             try:
                 # Request updates for all entities
-                for entity_id, (member_index, signal_name) in entity_map.items():
+                for entity_id, (member_index, signal_name, additional_can_ids) in entity_map.items():
                     self.can_interface.read_signal(member_index, signal_name)
                     
                     # Small delay between requests to avoid flooding the bus
@@ -338,41 +372,176 @@ class StiebelControl:
                 logger.error(f"Error in update loop: {e}")
                 time.sleep(5)  # Wait a bit before retrying
                 
-    def _can_value_update_callback(self, signal_name: str, value: Any):
+    def _dynamically_register_entity(self, signal_name: str, value: Any, can_id: int) -> str:
+        """
+        Dynamically register an entity with Home Assistant based on signal characteristics.
+        
+        Args:
+            signal_name: Name of the signal
+            value: Current value of the signal
+            can_id: CAN ID of the member that sent the message
+            
+        Returns:
+            str: The newly created entity ID, or None if registration failed
+        """
+        # Get signal information
+        ei = get_elster_index_by_english_name(signal_name)
+        if ei.name == "UNKNOWN":
+            logger.warning(f"Cannot register unknown signal: {signal_name}")
+            return None
+            
+        # Get CAN member name from ID
+        can_member_name = self._get_can_member_name_from_id(can_id)
+        if not can_member_name:
+            logger.warning(f"Cannot register signal from unknown CAN ID: 0x{can_id:X}")
+            return None
+            
+        # Create a unique entity ID based on CAN member and signal
+        # Format: can_member_signal_name (lowercase, underscores)
+        entity_id = f"{can_member_name.lower()}_{signal_name.lower()}"
+        entity_id = entity_id.replace(' ', '_')
+        
+        # If entity already exists, don't register again
+        if entity_id in self.registered_entities:
+            return entity_id
+            
+        # Create a friendly name - simply use the entity_id format as requested
+        friendly_name = f"{can_member_name}_{signal_name}"
+        
+        # Determine entity type and attributes based on signal type
+        entity_type = "sensor"  # Default entity type
+        device_class = None
+        state_class = "measurement"
+        unit_of_measurement = None
+        icon = None
+        
+        # Match signal type to appropriate entity configuration
+        if ei.type == ElsterType.ET_TEMPERATURE:
+            device_class = "temperature"
+            unit_of_measurement = "°C"
+            icon = "mdi:thermometer-lines"
+        elif ei.type == ElsterType.ET_BOOLEAN:
+            device_class = "binary_sensor"
+            icon = "mdi:toggle-switch"
+        elif ei.type == ElsterType.ET_PERCENT:
+            unit_of_measurement = "%"
+            icon = "mdi:percent"
+        elif ei.type == ElsterType.ET_HOUR or ei.type == ElsterType.ET_HOUR_SHORT:
+            device_class = "duration"
+            unit_of_measurement = "h"
+            icon = "mdi:timer"
+        elif ei.type == ElsterType.ET_PROGRAM_SWITCH:
+            # This should be a select entity, not a sensor
+            entity_type = "select"
+            icon = "mdi:tune-vertical"
+        elif ei.type == ElsterType.ET_DATE:
+            device_class = "date"
+            icon = "mdi:calendar"
+        elif ei.type == ElsterType.ET_DOUBLE_VALUE or ei.type == ElsterType.ET_TRIPLE_VALUE:
+            # Likely energy value, but could be other types
+            if "ENERGY" in signal_name or "KWH" in signal_name:
+                device_class = "energy"
+                unit_of_measurement = "kWh"
+                icon = "mdi:lightning-bolt"
+            elif "POWER" in signal_name:
+                device_class = "power"
+                unit_of_measurement = "W"
+                icon = "mdi:flash"
+            else:
+                # Generic numeric value
+                unit_of_measurement = ""
+                icon = "mdi:numeric"
+                
+        # Register the entity with Home Assistant
+        logger.info(f"Dynamically registering {entity_type} for signal {signal_name} from {can_member_name}")
+        
+        if entity_type == "sensor":
+            registered = self.mqtt_interface.register_sensor(
+                entity_id=entity_id,
+                name=friendly_name,
+                device_class=device_class,
+                state_class=state_class,
+                unit_of_measurement=unit_of_measurement,
+                icon=icon
+            )
+        elif entity_type == "select" and isinstance(value, str):
+            # For selects, we need to determine the options
+            # For program switches, we use betriebsartlist values
+            from stiebel_control.elster_table import BETRIEBSARTLIST
+            options = list(BETRIEBSARTLIST.values()) if hasattr(BETRIEBSARTLIST, 'values') else []
+            
+            registered = self.mqtt_interface.register_select(
+                entity_id=entity_id,
+                name=friendly_name,
+                options=options,
+                icon=icon
+            )
+        else:
+            # Fallback to sensor for unsupported types
+            registered = self.mqtt_interface.register_sensor(
+                entity_id=entity_id,
+                name=friendly_name,
+                icon="mdi:help-circle"
+            )
+            
+        if registered:
+            logger.info(f"Successfully registered dynamic entity {entity_id}")
+            # Add to registered entities
+            self.registered_entities.add(entity_id)
+            return entity_id
+        else:
+            logger.warning(f"Failed to register dynamic entity for {signal_name}")
+            return None
+
+    def _can_value_update_callback(self, signal_name: str, value: Any, can_id: int):
         """
         Callback for when a CAN value is updated.
         
         Args:
             signal_name: Name of the signal
             value: New value
+            can_id: CAN ID of the member that sent the message
         """
-        logger.debug(f"Received CAN value update for signal {signal_name}: {value}")
+        logger.debug(f"Received CAN value update for signal {signal_name} from CAN ID 0x{can_id:X}: {value}")
+        
+        # Get CAN member name from CAN ID
+        can_member_name = self._get_can_member_name_from_id(can_id)
+        if not can_member_name:
+            logger.debug(f"Unknown CAN ID: 0x{can_id:X}, unable to match to a CAN member")
+            return
+            
+        logger.debug(f"Resolved CAN ID 0x{can_id:X} to member: {can_member_name}")
+        
+        # Create a unique key for this signal+can_member combination
+        signal_key = f"{can_member_name}_{signal_name}"
+        
+        # Check if we should dynamically register this entity
+        dynamic_entity_registration = self.config.get('dynamic_entity_registration', False)
         
         # Find entities that use this signal and update them
         entities_config = self.config.get('entities', {})
-        
-        # Create a list of all configured signal names for easy debugging
-        if not hasattr(self, '_signal_map_logged'):
-            all_signals = set()
-            for sensor_id, sensor_config in entities_config.get('sensors', {}).items():
-                signal = sensor_config.get('signal')
-                if signal:
-                    all_signals.add(signal)
-            for select_id, select_config in entities_config.get('selects', {}).items():
-                signal = select_config.get('signal')
-                if signal:
-                    all_signals.add(signal)
-            logger.info(f"Configured signals in the configuration: {sorted(list(all_signals))}")
-            self._signal_map_logged = True
-        
         match_found = False
+        
+        # 1. First try to match with configured entities
         
         # Check sensors
         for sensor_id, sensor_config in entities_config.get('sensors', {}).items():
             config_signal = sensor_config.get('signal')
-            if config_signal == signal_name:
+            
+            # Get the list of allowed CAN members for this sensor
+            if 'can_members' in sensor_config:
+                # New format with list of CAN members
+                config_can_members = sensor_config.get('can_members', ['PUMP'])
+            else:
+                # Legacy format with single primary CAN member
+                primary_member = sensor_config.get('can_member', 'PUMP')
+                additional_members = sensor_config.get('additional_can_members', [])
+                config_can_members = [primary_member] + additional_members
+            
+            # Process if signal matches and CAN member is in the allowed list
+            if config_signal == signal_name and can_member_name in config_can_members:
                 match_found = True
-                logger.debug(f"Found matching sensor {sensor_id} for signal {signal_name}")
+                logger.debug(f"Found matching sensor {sensor_id} for signal {signal_name} from {can_member_name}")
                 # Apply any transformations if configured
                 transformed_value = self._apply_transformation(value, sensor_config.get('transform'))
                 
@@ -390,9 +559,21 @@ class StiebelControl:
         # Check selects
         for select_id, select_config in entities_config.get('selects', {}).items():
             config_signal = select_config.get('signal')
-            if config_signal == signal_name:
+            
+            # Get the list of allowed CAN members for this select
+            if 'can_members' in select_config:
+                # New format with list of CAN members
+                config_can_members = select_config.get('can_members', ['PUMP'])
+            else:
+                # Legacy format with single primary CAN member
+                primary_member = select_config.get('can_member', 'PUMP')
+                additional_members = select_config.get('additional_can_members', [])
+                config_can_members = [primary_member] + additional_members
+            
+            # Process if signal matches and CAN member is in the allowed list
+            if config_signal == signal_name and can_member_name in config_can_members:
                 match_found = True
-                logger.debug(f"Found matching select {select_id} for signal {signal_name}")
+                logger.debug(f"Found matching select {select_id} for signal {signal_name} from {can_member_name}")
                 # Selects don't have transformations
                 
                 # Update the cache
@@ -405,9 +586,51 @@ class StiebelControl:
                     logger.debug(f"Successfully published {select_id} state")
                 else:
                     logger.warning(f"Failed to publish {select_id} state")
+        
+        # 2. If no match found and dynamic registration is enabled, register a new entity
+        if not match_found and dynamic_entity_registration:
+            # Check if we've already dynamically registered this signal
+            dynamic_entity_key = f"{can_member_name.lower()}_{signal_name.lower()}".replace(' ', '_')
+            
+            if dynamic_entity_key in self.registered_entities:
+                # We've already registered this entity, publish the state
+                logger.debug(f"Updating dynamically registered entity {dynamic_entity_key}")
+                published = self.mqtt_interface.publish_state(dynamic_entity_key, value)
+                if published:
+                    logger.debug(f"Successfully published {dynamic_entity_key} state")
+                else:
+                    logger.warning(f"Failed to publish {dynamic_entity_key} state")
+            else:
+                # Register a new entity dynamically
+                entity_id = self._dynamically_register_entity(signal_name, value, can_id)
+                if entity_id:
+                    # Entity was successfully registered, publish the initial state
+                    published = self.mqtt_interface.publish_state(entity_id, value)
+                    if published:
+                        logger.debug(f"Successfully published initial state for {entity_id}")
+                    else:
+                        logger.warning(f"Failed to publish initial state for {entity_id}")
+                        
+            match_found = True  # Mark as handled
                 
         if not match_found:
-            logger.debug(f"No entity matches found for signal {signal_name}")
+            logger.debug(f"No entity matches found for signal {signal_name} from {can_member_name}")
+            
+    def _get_can_member_name_from_id(self, can_id: int) -> Optional[str]:
+        """
+        Get the CAN member name from its CAN ID.
+        
+        Args:
+            can_id: CAN ID to look up
+            
+        Returns:
+            str: CAN member name, or None if not found
+        """
+        # Create inverse mapping of CAN ID to member name
+        for member in self.can_interface.can_members:
+            if member.can_id == can_id:
+                return member.name
+        return None
         
     def _mqtt_command_callback(self, entity_id: str, command: str):
         """

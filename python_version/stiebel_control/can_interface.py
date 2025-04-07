@@ -68,7 +68,7 @@ class CanInterface:
     def __init__(self, can_interface: str = 'can0', 
                  can_members: List[CanMember] = None, 
                  bitrate: int = 20000, 
-                 callback: Optional[Callable[[str, Any], None]] = None):
+                 callback: Optional[Callable[[str, Any, int], None]] = None):
         """Initialize the CAN interface.
         
         Args:
@@ -175,19 +175,20 @@ class CanInterface:
             logger.debug(f"CAN 0x{can_id:X}: {ei.english_name} = {typed_value}")
             
             # Store the latest value
-            self.latest_values[(can_id, index)] = typed_value
+            request_key = (can_id, index)
+            self.latest_values[request_key] = typed_value
             
             # If this is a response to a pending request, handle it
-            request_key = (can_id, index)
             if request_key in self.pending_requests:
                 request_info = self.pending_requests.pop(request_key)
                 # If there's a callback, invoke it
                 if request_info.get('callback'):
                     request_info['callback'](typed_value)
             
-            # If there's a global callback, invoke it
+            # If there's a global callback, invoke it with CAN ID
+            # Pass the CAN ID so the callback can filter by it
             if self.callback:
-                self.callback(ei.english_name, typed_value)
+                self.callback(ei.english_name, typed_value, can_id)
                 
         except Exception as e:
             logger.error(f"Error processing CAN message: {e}")
@@ -351,22 +352,36 @@ class CanInterface:
             logger.error(f"Error sending write request: {e}")
             return False
             
-    def get_latest_value(self, member_index: int, signal_name: str) -> Optional[Any]:
+    def get_latest_value(self, member_index: int, signal_name: str, can_member_ids: List[int] = None) -> Optional[Any]:
         """
         Get the latest value for a signal.
         
         Args:
-            member_index: Index of the CAN member
+            member_index: Primary index of the CAN member
             signal_name: Name of the signal
+            can_member_ids: Optional list of specific CAN IDs to check in addition to the primary member
             
         Returns:
             The latest value if available, None otherwise
         """
         try:
-            member = self.can_members[member_index]
             ei = get_elster_index_by_name(signal_name)
             
-            return self.latest_values.get((member.can_id, ei.index))
+            # First check the primary member
+            member = self.can_members[member_index]
+            value = self.latest_values.get((member.can_id, ei.index))
+            if value is not None:
+                return value
+                
+            # If a list of additional CAN IDs was provided, check those too
+            if can_member_ids:
+                for can_id in can_member_ids:
+                    value = self.latest_values.get((can_id, ei.index))
+                    if value is not None:
+                        return value
+                        
+            # Fall back to primary member's value (which will be None at this point)
+            return value
         except Exception as e:
             logger.error(f"Error getting latest value: {e}")
             return None
