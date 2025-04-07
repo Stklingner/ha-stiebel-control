@@ -95,6 +95,12 @@ class StiebelControl:
                 discovery_prefix=mqtt_config.get('discovery_prefix', 'homeassistant'),
                 base_topic=mqtt_config.get('base_topic', 'stiebel_control')
             )
+            
+            # Connect to the MQTT broker immediately 
+            # This ensures we're connected before any entities are registered
+            if not self.mqtt_interface.connect():
+                logger.warning("Failed to connect to MQTT broker, will retry during startup")
+                
         except Exception as e:
             logger.error(f"Failed to initialize MQTT interface: {e}")
             sys.exit(1)
@@ -121,6 +127,11 @@ class StiebelControl:
         logger.info("Starting Stiebel Control")
         
         try:
+            # Ensure MQTT is connected
+            if hasattr(self, 'mqtt_interface') and not self.mqtt_interface.connected:
+                logger.info("Connecting to MQTT broker...")
+                self.mqtt_interface.connect()
+                
             # Connect to the CAN bus
             if hasattr(self, 'can_interface'):
                 self.can_interface.start()
